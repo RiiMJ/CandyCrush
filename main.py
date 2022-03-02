@@ -2,6 +2,7 @@ import pygame as py
 
 import random 
 import time
+import copy
 
 FPS = 30
 screen_width = 800
@@ -42,26 +43,9 @@ def main():
         for y in range(board_width):
             r =py.Rect((XMARGIN+(x*image_size), YMARGIN+(y*image_size), image_size, image_size))
             boardRect[x].append(r)
-
-def getBlankBoard():
-    board = []
-    for x in range(board_width):
-        board.append([-1]*board_height)
-    return board
-
-def fillBoardAndAnimate(board, points, score):
-    dropslots = getDropSlots(board)
-    while dropslots != [[]]*board_width:
-        moving_gems - getDroppingGems(board)
-        for x in range(len(dropslots)):
-            if len(dropSlots[x])!=0:
-                moving_gems.append({})
-
-def runGame():
-    gameBoard = getBlankBoard()
-    score = 0
-    fillBoardAndAnimate(gameboard, [], score)
-
-
-
     
+    while True:
+        runGame()
+
+
+
