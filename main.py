@@ -1,4 +1,5 @@
 import pygame as py
+from pygame.locals import *
 
 import random 
 import time
@@ -11,6 +12,7 @@ board_width = 8
 board_height = 8
 image_size = 64
 moverate = 25
+deductspeed = 0.8
 
 purple = (255,0,255)
 lightblue = (170,190,255)
@@ -22,39 +24,40 @@ brown = (85,65,0)
 XMARGIN = int((screen_width-image_size*board_width)/2)
 YMARGIN = int((screen_height-image_size*board_height)/2)
 
+global screen, clk, GEMIMGS, sounds, font, boardRects, GAMESOUNDS
+
 py.init()
+screen=py.display.set_mode(screen_width,screen_height)
 
-def main():
-    global clk, screen, gems, sounds, font
-    clk = py.time.Clock()
-    screen = py.display.set_mode((screen_width,screen_height))
-    py.display.set_caption('game')
-    font = py.font.Font('freesansbold.ttf', 36)
+clk = py.time.Clock()
+py.display.set_caption('game')
+font = py.font.Font('freensansbold.ttf', 36)
 
-    #load images
-    gems = []
-    for i in range(1, 7):
-        gem = py.image.load('gem%s.png' %i)
-        if gem.get_size()!=(image_size, image_size):
-            gem = py.transform.smoothscale(gem, (image_size,image_size))
-        gems.append(gem)
-    
-    #load sounds
-    sounds = {}
-    sounds['badswap'] = py.mixer.Sound('badswap.wav')
-    sounds['match'] = py.mixer.Sound('match.wav')
-    
-    #py.Rect objects for each box to do board to pixel coordinate conversion
-    boardRect = []
+GEMIMGS = []
+for i in range(1, 8):
+    gemImg = py.image.load('gem%s.png' %i)
+    if gemImg.get_size() != (image_size, image_size):
+        gemImg = py.transform.smoothscale(gemImg, (image_size, image_size))
+        GEMIMGS.append(gemImg)
+
+GAMESOUNDS = {}
+GAMESOUNDS['bad swap'] = py.mixer.Sound('badswap.wav')
+GAMESOUNDS['match'] = []
+for i in range(6):
+    GAMESOUNDS['match'].append(py.mixer.Sound('match%s.wav' %i))
+
+boardRects = []
+for x in range(board_width):
+    boardRects.append([])
+    for y in range(board_width):
+        r = py.Rect((XMARGIN + (x*image_size), YMARGIN + (y*image_size), image_size, image_size))
+        boardRects[x].append(r)
+
+def drawBoard(board):
     for x in range(board_width):
-        boardRect.append([])
-        for y in range(board_width):
-            r = py.Rect((XMARGIN+(x*image_size), YMARGIN+(y*image_size), image_size, image_size))
-            boardRect[x].append(r)
+        for y in range(board_height):
+            screen.blit(GEMIMGS[], (XMARGIN + (x*image_size), YMARGIN + (y*image_size)))
     
-    while True:
-        runGame()
-
 #creates blank board data structure
 def getBlankBoard():
     board = []
@@ -101,14 +104,14 @@ def canMakeMove(board):
     for x in range(board_width):
         for y in range(board_height):
             for pat in oneOffPatterns:
-                if (getGemAt(board, x+pat[0][0], y+pat[0][1]) == 
+                if  (getGemAt(board, x+pat[0][0], y+pat[0][1]) == 
                     getGemAt(board, x+pat[1][0], y+pat[1][1]) == 
                     getGemAt(board, x+pat[2][0], y+pat[2][1] != None) or 
                     (getGemAt(board, x+pat[0][1], y+pat[0][0]) == 
                     getGemAt(board, x+pat[1][1], y+pat[1][0]) == 
-                    getGemAt(board, x+pat[2][1], y+pat[2][0]) != None):
+                    getGemAt(board, x+pat[2][1], y+pat[2][0]) != None)):
                     return True    
-     return False
+    return False
 
 def drawMovingGem(gem, progress):
     movex = 0
@@ -144,14 +147,13 @@ def pullDownAllGems(board):
 
 def getDropSlots(board):
     boardCopy = copy.deepcopy(board)
-    pulDownAllGems(boardCopy)
+    pullDownAllGems(boardCopy)
 
     dropSlots = []
-    for i in range(board_width):
+    for x in range(board_width):
         for y in range(board_height-1, -1, -1):
-
             if boardCopy[x][y] == -1:
-                possibleGems = list(range(len(gems)))
+                possibleGems = list(range(len(GEMIMGS)))
                 for offsetX,offsetY in ((0,-1), (1,0), (0,1), (-1,0)):
                     nextGem = getGemAt(boardCopy, x+offsetX, y+offsetY)
                     if nextGem != None and nextGem in possibleGems:
@@ -181,7 +183,7 @@ def findMatchingGems(board):
                 removeSet = []
                 while getGemAt(boardCopy, x, y + offset) == targetGem:
                     removeSet.append((x, y + offset ))
-                    boardCopy[x][y + offset] = EMPTY_SPACE
+                    boardCopy[x][y + offset] = -1
                     offset +=1
                 gemsToRemove.append(removeSet)
     return gemsToRemove
@@ -205,11 +207,11 @@ def animateMovingGems(board, gems, pointsText, score):
             drawMovingGem(gem, progress)
         drawScore(score)
         for pointText in pointsText:
-            pointsSurf = BASICFONT.render(str(pointText['points']), 1, red)
+            pointsSurf = font.render(str(pointText['points']), 1, red)
             pointsRect = pointsSurf.get_rect()
             pointsRect.Center = (pointText['x'], pointText['y'])
             screen.blit(pointsSurf, pointsRect)
-        pygame.display.update()
+        py.display.update()
         clk.tick(FPS)
         progress += moverate
 
@@ -233,7 +235,7 @@ def moveGems(board, movingGems):
 
 def fillBoardAndAnimate(board, points, score):
     dropSlots = getDropSlots(board)
-    while dropSlots != [[]] * BOARDWIDTH:
+    while dropSlots != [[]] * board_width:
         movingGems = getDroppingGems(board)
         for x in range(len(dropSlots)):
             if len(dropSlots[x]) != 0:
@@ -251,10 +253,10 @@ def fillBoardAndAnimate(board, points, score):
 def checkForGemClick(pos):
     for x in range(board_width):
         for y in range(board_height):
-            pygame.draw.rect(screen, black, baordRect[x][y], 1)
+            py.draw.rect(screen, black, boardRects[x][y], 1)
             gemToDraw = board[x][y]
             if gemToDraw != -1:
-                DISPLAYSURF.blit(gems[gemToDraw], boardRect[x][y])
+                screen.blit(GEMIMGS[gemToDraw], boardRects[x][y])
 
 def getBoardCopyMinusGems(board, gems):
     boardCopy = copy.deepcopy(board)
@@ -265,7 +267,7 @@ def getBoardCopyMinusGems(board, gems):
     return boardCopy
 
 def drawScore(score):
-    scoreImg = BASICFONT.render(str(score), 1, SCORECOLOR)
+    scoreImg = font.render(str(score), 1, red)
     scoreRect = scoreImg.get_rect()
     scoreRect.bottomleft = (10, screen_height - 6 )
     screen.blit(scoreImg, scoreRect)
@@ -281,79 +283,83 @@ def runGame():
     lastScoreDeduction = time.time()
     clickContinueTextSurf = None
 
-    while True:
-        clickedSpace = None
-        for event in pygame.event.get():
-            if event.type == py.QUIT()
-                pygame.quit()
-
-            elif event.type == KEYUP and event.key == K_BACKSPACE:
-                return
-            elif event.type == MOUSEBUTTONUP:
-                if gameIsOver:
-                    return
-                if event.pos == (lastMouseDownX, lastMouseDownY):
-                    clickedSpace = checkForGemClick(event.post)
-                else:
-                    firstSelectedGem = checkForGemClick((lastMouseDownX, lastMouseDownY))
-                    clickedSpace = checkForGemClick(event.post)
-                    if not firstSelectedGem or not clickedSpace:
-                        firstSelectedGem = None
-                        clickedSpace = None
-                    elif event.type == MOUSEBUTTONDOWN:
-                        lastMouseDownX, lastMouseDownY = event.pos
-                if clickedSpace and not fistSelectedGem:
-                    firstSelectedGem = clickedSpace
-                elif clickedSpace and firstSelectedGem:
-                    firstSwappingGem, secondSwappingGem = getSwappingGems(gameBoard, firstSelectedGem, clickedSpace)
-                    if firstSwappingGem == None and secondSwappingGem == None:
-                        firstSelectedGem = None
-                        continue
-                    boardCopy = getBoardCopyMinusGems(gameBoard, firstSwappingGem, secondSwappingGem)
-                    animateMovingGems(boardcopy, [firstSwappingGem, secondSwappingGem], [], score)
-                    gameBoard[firstSwappingGem['x']][firstSwappingGem['y']] = firstSwappingGem['gemNum']
-                    matchedGems = findMatchingGems(gameBoard)
-                    if matchedGems == []:
-                        GAMESOUNDS['bad swap'].play()
-                        animateMovingGems(boardCopy, [firstSwappingGem, secondSwappingGem], [], score)
-                        gameBoard[firstSwappingGem['x']][firstSwappingGem['y']] = firstSwappingGem['gemNum']
-                        gameBoard[secondSwappingGem['x']][secondSwappingGem['y']] = secondSwappingGem['gemNum']
-                    else:
-                        scoreAdd = 0
-                        while matchedGems !=[]:
-                            points = []
-                            for gemSet in matchedGems:
-                                scoreAdd += ( 10 + (len(gemSet) - 3 ) * 10 )
-                                for gem in gemSet:
-                                    gameBoard[gem[0]][gem[1]] = -1
-                                points.append({'points':scoreAdd,
-                                               'x': gem[0] * image_size + XMARGIN,
-                                               'y': gem[1] * image_size + YMARGIN})
-                                random.choice(sounds['match']).play()
-                                score += scoreAdd
-                                fillBoardAndAnimate(gameBoard, points, score)
-                                matchedGems = findMatchingGems(gameBoard)
-                            firstSelectedGems = None
-                            if not canMakeMove(gameBoard):
-                                gameIsOver = True
-            screen.fill(lightblue)
-            drawBoard(gameBoard)
-            if firstSelectedGem != None:
-                highlightSpace(firstSelectedGem['x'], firstSelectedGem['y'])
+    clickedSpace = None
+    for event in py.event.get():
+            
+        if event.type == KEYUP and event.key == K_BACKSPACE:
+            return
+        elif event.type == MOUSEBUTTONUP:
             if gameIsOver:
-                if clickContinueTextSurf == None:
-                    clickContinueTextSurf = font.render('Final Score: %s(click to continue)' %(score), 1, GAMEOVERCOLOR, GAMEOVERBGCOLOR)
-                    clickContinueTextRect = clickContinueTextSurf.get_rect()
-                    clickContinueTextRect.center = int(screen_width / 2 ), int(screen_height / 2)
-                screen.blit(clickContinueTextSurf, clickContinueTextRect)
-            elif score > 0 and time.time() - lastScoreDeduction > DEDUCTSPEED:
-                score -=1
-                lastScoreDeduction = time.time()
-            drawScore(score)
-            py.display.update()
-            clk.tick(FPS)
+                return
+            if event.pos == ( lastMouseDownX, lastMouseDownY):
+                clickedSpace = checkForGemClick(event.post)
+            else:
+                firstSelectedGem = checkForGemClick((lastMouseDownX, lastMouseDownY))
+                clickedSpace = checkForGemClick(event.post)
+                if not firstSelectedGem or not clickedSpace:
+                    firstSelectedGem = None
+                    clickedSpace = None
+                elif event.type == MOUSEBUTTONDOWN:
+                    lastMouseDownX, lastMouseDownY = event.pos
+            if clickedSpace and not firstSelectedGem:
+                firstSelectedGem = clickedSpace
+            elif clickedSpace and firstSelectedGem:
+                firstSwappingGem, secondSwappingGem = getSwappingGems(gameBoard, firstSelectedGem, clickedSpace)
+                if firstSwappingGem == None and secondSwappingGem == None:
+                    firstSelectedGem = None
+                    continue
+                boardcopy = getBoardCopyMinusGems(gameBoard, firstSwappingGem, secondSwappingGem)
+                animateMovingGems(boardcopy, [firstSwappingGem, secondSwappingGem], [], score)
+                gameBoard[firstSwappingGem['x']][firstSwappingGem['y']] = firstSwappingGem['imageNum']
+                matchedGems = findMatchingGems(gameBoard)
+                if matchedGems == []:
+                    GAMESOUNDS['bad swap'].play()
+                    animateMovingGems(boardcopy, [firstSwappingGem, secondSwappingGem], [], score)
+                    gameBoard[firstSwappingGem['x']][firstSwappingGem['y']] = firstSwappingGem['imageNum']
+                    gameBoard[secondSwappingGem['x']][secondSwappingGem['y']] = secondSwappingGem['imageNum']
+                else:
+                    scoreAdd = 0
+                    while matchedGems !=[]:
+                        points = []
+                        for gemSet in matchedGems:
+                            scoreAdd += ( 10 + (len(gemSet) - 3 ) * 10 )
+                            for gem in gemSet:
+                                gameBoard[gem[0]][gem[1]] = -1
+                            points.append({'points':scoreAdd,
+                                            'x': gem[0] * image_size + XMARGIN,
+                                            'y': gem[1] * image_size + YMARGIN})
+                            random.choice(GAMESOUNDS['match']).play()
+                            score += scoreAdd
+                            fillBoardAndAnimate(gameBoard, points, score)
+                            matchedGems = findMatchingGems(gameBoard)
+                        firstSelectedGems = None
+                        if not canMakeMove(gameBoard):
+                            gameIsOver = True
+        screen.fill(lightblue)
+        drawBoard(gameBoard)
+        if firstSelectedGem != None:
+        py.draw.rect(screen, purple, boardRects[firstSelectedGem['x']][firstSelectedGem['y']], 4)
+        if gameIsOver:
+            if clickContinueTextSurf == None:
+                clickContinueTextSurf = font.render('Final Score: %s(click to continue)' %(score), 1, red, black)
+                clickContinueTextRect = clickContinueTextSurf.get_rect()
+                clickContinueTextRect.center = int(screen_width / 2 ), int(screen_height / 2)
+            screen.blit(clickContinueTextSurf, clickContinueTextRect)
+        elif score > 0 and time.time() - lastScoreDeduction > deductspeed:
+            score -=1
+            lastScoreDeduction = time.time()
+        drawScore(score)
+        py.display.update()
+        clk.tick(FPS)
+
+def main():
+    
+    while True:
+        for event in py.event.get():
+            if event.type == QUIT:
+                py.quit()
+        
+    runGame()
 
 if __name__=='__main__':
     main()
-    
-   
