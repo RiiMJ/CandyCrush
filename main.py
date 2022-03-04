@@ -271,6 +271,89 @@ def drawScore(score):
     screen.blit(scoreImg, scoreRect)
 
 def runGame():
-    
+    gameBoard = getBlankBoard()
+    score = 0
+    fillBoardAndAnimate(gameBoard, [], score)
+    firstSelectedGem = None
+    lastMouseDownX  = None
+    lastMouseDownY = None
+    gameIsOver = False
+    lastScoreDeduction = time.time()
+    clickContinueTextSurf = None
+
+    while True:
+        clickedSpace = None
+        for event in pygame.event.get():
+            if event.type == py.QUIT()
+                pygame.quit()
+
+            elif event.type == KEYUP and event.key == K_BACKSPACE:
+                return
+            elif event.type == MOUSEBUTTONUP:
+                if gameIsOver:
+                    return
+                if event.pos == (lastMouseDownX, lastMouseDownY):
+                    clickedSpace = checkForGemClick(event.post)
+                else:
+                    firstSelectedGem = checkForGemClick((lastMouseDownX, lastMouseDownY))
+                    clickedSpace = checkForGemClick(event.post)
+                    if not firstSelectedGem or not clickedSpace:
+                        firstSelectedGem = None
+                        clickedSpace = None
+                    elif event.type == MOUSEBUTTONDOWN:
+                        lastMouseDownX, lastMouseDownY = event.pos
+                if clickedSpace and not fistSelectedGem:
+                    firstSelectedGem = clickedSpace
+                elif clickedSpace and firstSelectedGem:
+                    firstSwappingGem, secondSwappingGem = getSwappingGems(gameBoard, firstSelectedGem, clickedSpace)
+                    if firstSwappingGem == None and secondSwappingGem == None:
+                        firstSelectedGem = None
+                        continue
+                    boardCopy = getBoardCopyMinusGems(gameBoard, firstSwappingGem, secondSwappingGem)
+                    animateMovingGems(boardcopy, [firstSwappingGem, secondSwappingGem], [], score)
+                    gameBoard[firstSwappingGem['x']][firstSwappingGem['y']] = firstSwappingGem['gemNum']
+                    matchedGems = findMatchingGems(gameBoard)
+                    if matchedGems == []:
+                        GAMESOUNDS['bad swap'].play()
+                        animateMovingGems(boardCopy, [firstSwappingGem, secondSwappingGem], [], score)
+                        gameBoard[firstSwappingGem['x']][firstSwappingGem['y']] = firstSwappingGem['gemNum']
+                        gameBoard[secondSwappingGem['x']][secondSwappingGem['y']] = secondSwappingGem['gemNum']
+                    else:
+                        scoreAdd = 0
+                        while matchedGems !=[]:
+                            points = []
+                            for gemSet in matchedGems:
+                                scoreAdd += ( 10 + (len(gemSet) - 3 ) * 10 )
+                                for gem in gemSet:
+                                    gameBoard[gem[0]][gem[1]] = -1
+                                points.append({'points':scoreAdd,
+                                               'x': gem[0] * image_size + XMARGIN,
+                                               'y': gem[1] * image_size + YMARGIN})
+                                random.choice(sounds['match']).play()
+                                score += scoreAdd
+                                fillBoardAndAnimate(gameBoard, points, score)
+                                matchedGems = findMatchingGems(gameBoard)
+                            firstSelectedGems = None
+                            if not canMakeMove(gameBoard):
+                                gameIsOver = True
+            screen.fill(lightblue)
+            drawBoard(gameBoard)
+            if firstSelectedGem != None:
+                highlightSpace(firstSelectedGem['x'], firstSelectedGem['y'])
+            if gameIsOver:
+                if clickContinueTextSurf == None:
+                    clickContinueTextSurf = font.render('Final Score: %s(click to continue)' %(score), 1, GAMEOVERCOLOR, GAMEOVERBGCOLOR)
+                    clickContinueTextRect = clickContinueTextSurf.get_rect()
+                    clickContinueTextRect.center = int(screen_width / 2 ), int(screen_height / 2)
+                screen.blit(clickContinueTextSurf, clickContinueTextRect)
+            elif score > 0 and time.time() - lastScoreDeduction > DEDUCTSPEED:
+                score -=1
+                lastScoreDeduction = time.time()
+            drawScore(score)
+            py.display.update()
+            clk.tick(FPS)
+
+if __name__=='__main__':
+    main()
     
    
